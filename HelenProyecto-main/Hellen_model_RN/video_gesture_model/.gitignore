@@ -2,9 +2,16 @@ venv_model/
 .venv/
 __pycache__/
 *.pyc
-data/
+
+# Ignorar TODO lo que hay dentro de data...
+data/*
+
+# ...pero hacer excepciones para estos dos directorios:
+!data/models/
+!data/models/**
+!data/features/
+!data/features/**
+
 logs/
-*.npz
-*.weights.h5
 *.keras
 *.mp4
