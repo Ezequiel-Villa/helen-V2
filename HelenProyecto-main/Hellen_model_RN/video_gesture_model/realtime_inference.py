@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
+import urllib.error
+import urllib.request
 from collections import deque
 from pathlib import Path
 from typing import Callable, Deque, Dict, Optional
@@ -45,6 +48,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", type=int, default=0, help="Índice de cámara para OpenCV.")
     parser.add_argument("--confidence-threshold", type=float, default=0.8, help="Umbral de confianza para mostrar etiqueta.")
     parser.add_argument("--sequence-length", type=int, default=config.SEQUENCE_LENGTH, help="Longitud de la ventana temporal.")
+    parser.add_argument(
+        "--backend-url",
+        type=str,
+        default="http://127.0.0.1:5000/gestures/gesture-key",
+        help=(
+            "Endpoint del backend Helen para reenviar los gestos reconocidos. "
+            "Usa 'none' o cadena vacía para deshabilitar el envío."
+        ),
+    )
+    parser.add_argument(
+        "--cooldown-seconds",
+        type=float,
+        default=1.0,
+        help=(
+            "Tiempo mínimo en segundos entre envíos consecutivos del mismo gesto hacia el frontend. "
+            "Permite evitar múltiples activaciones por la misma predicción."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -98,6 +119,84 @@ def build_predict_fn(model_path: Path) -> Callable[[np.ndarray], np.ndarray]:
     )
 
 
+class FrontendBridge:
+    """Envía los gestos reconocidos al backend vía HTTP."""
+
+    _COOLDOWN_OVERRIDES = {
+        "activar": 1.5,
+        "agregar": 2.0,
+    }
+
+    def __init__(self, endpoint: Optional[str], *, cooldown: float = 1.0) -> None:
+        endpoint = (endpoint or "").strip()
+        if endpoint.lower() in {"", "none", "null", "off"}:
+            endpoint = ""
+
+        self.endpoint = endpoint
+        self.cooldown = max(0.0, float(cooldown))
+        self._last_sent: Dict[str, float] = {}
+        self._sequence = 0
+        self._last_error_at = 0.0
+
+    def _cooldown_for(self, label: str) -> float:
+        return float(self._COOLDOWN_OVERRIDES.get(label, self.cooldown))
+
+    def _should_send(self, label: str) -> bool:
+        if not self.endpoint or not label:
+            return False
+
+        now = time.monotonic()
+        cooldown = self._cooldown_for(label)
+        last = self._last_sent.get(label)
+        if last is not None and cooldown > 0 and (now - last) < cooldown:
+            return False
+
+        self._last_sent[label] = now
+        return True
+
+    def send(self, label: str, score: float) -> None:
+        """Publica el gesto en el backend Helen."""
+
+        normalized = label.strip().lower()
+        if not self._should_send(normalized):
+            return
+
+        self._sequence += 1
+        payload = {
+            "gesture": label,
+            "character": label,
+            "score": float(score),
+            "sequence": self._sequence,
+        }
+
+        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        request = urllib.request.Request(
+            self.endpoint,
+            data=data,
+            headers={"Content-Type": "application/json", "User-Agent": "helen-gesture-bridge"},
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(request, timeout=2.0) as response:
+                if response.status >= 400:
+                    raise urllib.error.HTTPError(
+                        self.endpoint,
+                        response.status,
+                        response.reason,
+                        response.headers,
+                        None,
+                    )
+        except urllib.error.URLError as error:
+            now = time.monotonic()
+            if now - self._last_error_at > 5.0:
+                print(f"[WARN] No se pudo notificar el gesto '{label}' al backend: {error}")
+                self._last_error_at = now
+            return
+
+        print(f"[INFO] Gesto enviado al backend: {label} ({score:.2f})")
+
+
 def main() -> None:
     """Configurar MediaPipe, cargar el modelo y realizar inferencia cuadro a cuadro."""
     args = parse_args()
@@ -122,6 +221,12 @@ def main() -> None:
     # Predictor unificado (SavedModel o .keras/.h5)
     predict = build_predict_fn(model_dir_or_file)
     print(f"Modelo cargado desde {model_dir_or_file}")
+
+    bridge = FrontendBridge(args.backend_url, cooldown=args.cooldown_seconds)
+    if bridge.endpoint:
+        print(f"Los gestos se enviarán al backend en {bridge.endpoint}")
+    else:
+        print("Envío al frontend deshabilitado (sin backend-url)")
 
     # MediaPipe Hands detectará hasta dos manos y devolverá sus landmarks por frame.
     hands = mp.solutions.hands.Hands(
@@ -192,6 +297,8 @@ def main() -> None:
                         (0, 255, 0),
                         3,
                     )
+                    if label and label != "?":
+                        bridge.send(str(label), confidence)
 
             cv2.imshow("Detección de gestos", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):

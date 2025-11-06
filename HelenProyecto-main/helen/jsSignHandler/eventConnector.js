@@ -1088,6 +1088,7 @@ const enhancedGoToDevices = () => goToPageWithLoading("pages/devices/devices.htm
 const enhancedGoToHome = () => goToPageWithLoading("index.html", "Inicio");
 const enhancedGoToAlarm = () => goToPageWithLoading("pages/clock/alarm.html", "Alarma");
 const enhancedGoToSettings = () => goToPageWithLoading("pages/settings/settings.html", "Ajustes");
+const enhancedGoToTutorial = () => goToPageWithLoading("pages/tutorial/tutorial.html", "Tutorial");
 
 window.goToClock = enhancedGoToClock;
 window.goToWeather = enhancedGoToWeather;
@@ -1095,6 +1096,7 @@ window.goToDevices = enhancedGoToDevices;
 window.goToHome = enhancedGoToHome;
 window.goToAlarm = enhancedGoToAlarm;
 window.goToSettings = enhancedGoToSettings;
+window.goToTutorial = enhancedGoToTutorial;
 window.triggerActivationAnimation = triggerActivationAnimation;
 window.triggerRingError = triggerRingError;
 window.setActivationRingState = setRingState;
