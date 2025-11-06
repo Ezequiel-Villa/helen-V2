@@ -3,8 +3,6 @@ venv_model/
 __pycache__/
 *.pyc
 data/
-features/
-models/
 logs/
 *.npz
 *.weights.h5
