@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HELEN – Información</title>
+
+  <!-- Estilos base del proyecto -->
+  <link rel="stylesheet" href="../../css/globals.css" />
+  <!-- Íconos (mismo CDN que settings) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <!-- Estilos locales de esta pantalla -->
+  <link rel="stylesheet" href="../css/info.css" />
+</head>
+
+<body>
+  <main class="info-wrap raspberry-fit-root" data-raspberry-fit-root>
+    <!-- =============== MENÚ (2x2) =============== -->
+    <section id="menu" class="info-view is-active" data-title="Información">
+      <header class="info-header">
+        <button class="back-button" onclick="window.location.href='settings.html'">
+          <i class="bi bi-arrow-left"></i>
+        </button>
+        <div class="title-col">
+          <h1>Información</h1>
+          <p class="subtitle">Conoce más sobre HELEN y nuestro equipo</p>
+        </div>
+      </header>
+
+      <div class="info-grid">
+        <a class="qcard" href="#introduccion">
+          <span class="qcard__icon" aria-hidden="true"><i class="bi bi-book"></i></span>
+          <span class="qcard__title">Introducción</span>
+          <span class="qcard__subtitle">Conoce más sobre HELEN</span>
+        </a>
+
+        <a class="qcard" href="#tecnologias">
+          <span class="qcard__icon" aria-hidden="true"><i class="bi bi-cpu"></i></span>
+          <span class="qcard__title">Tecnologías</span>
+          <span class="qcard__subtitle">Stack tecnológico utilizado</span>
+        </a>
+
+        <a class="qcard" href="#equipo">
+          <span class="qcard__icon" aria-hidden="true"><i class="bi bi-people"></i></span>
+          <span class="qcard__title">Equipo de desarrollo</span>
+          <span class="qcard__subtitle">Nuestro equipo de trabajo</span>
+        </a>
+
+        <a class="qcard" href="#display-mode">
+          <span class="qcard__icon" aria-hidden="true"><i class="bi bi-tablet-landscape"></i></span>
+          <span class="qcard__title">Modo Raspberry</span>
+          <span class="qcard__subtitle">Optimiza HELEN para pantallas táctiles</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- =============== INTRODUCCIÓN =============== -->
+    <section id="introduccion" class="info-view" data-title="Introducción">
+      <header class="info-header">
+        <button class="back-button" onclick="window.location.href='#menu'">
+          <i class="bi bi-arrow-left"></i>
+        </button>
+        <div class="title-col">
+          <h1>Introducción</h1>
+          <p class="subtitle">Detalles y recursos adicionales</p>
+        </div>
+      </header>
+
+      <div class="panel">
+        <p>
+          HELEN es un asistente virtual interactivo enfocado en mejorar la accesibilidad de personas sordas,
+          proporcionando herramientas visuales como reloj, clima y avisos importantes integrados.
+        </p>
+      </div>
+
+      <div class="panel">
+        <h2>Objetivos</h2>
+        <p>
+          Brindar una plataforma accesible e inclusiva para personas con discapacidad auditiva mediante
+          la integración de herramientas visuales, interpretación de señas y avisos importantes integrados.
+        </p>
+      </div>
+    </section>
+
+    <!-- =============== TECNOLOGÍAS =============== -->
+    <section id="tecnologias" class="info-view" data-title="Tecnologías">
+      <header class="info-header">
+        <button class="back-button" onclick="window.location.href='#menu'">
+          <i class="bi bi-arrow-left"></i>
+        </button>
+        <div class="title-col">
+          <h1>Tecnologías</h1>
+          <p class="subtitle">Detalles y recursos adicionales</p>
+        </div>
+      </header>
+
+      <div class="panel">
+
+        <p>HELEN ha sido desarrollado utilizando tecnologías web e IA para ofrecer una experiencia óptima.</p>
+
+        <div class="tech-grid">
+          <div class="tech-pill"><span class="dot"></span>React.js + Typescript</div>
+          <div class="tech-pill"><span class="dot"></span>Node.js</div>
+          <div class="tech-pill"><span class="dot"></span>Streaming Azure</div>
+          <div class="tech-pill"><span class="dot"></span>MongoDB</div>
+          <div class="tech-pill"><span class="dot"></span>Traducción API</div>
+          <div class="tech-pill"><span class="dot"></span>Bootstrap</div>
+          <div class="tech-pill"><span class="dot"></span>Señas 3D</div>
+          <div class="tech-pill"><span class="dot"></span>Función Sígnar</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============== EQUIPO =============== -->
+    <section id="equipo" class="info-view" data-title="Equipo de desarrollo">
+      <header class="info-header">
+        <button class="back-button" onclick="window.location.href='#menu'">
+          <i class="bi bi-arrow-left"></i>
+        </button>
+        <div class="title-col">
+          <h1>Equipo de desarrollo</h1>
+          <p class="subtitle">Detalles y recursos adicionales</p>
+        </div>
+      </header>
+
+      <div class="panel">
+        <p> Nuestro equipo multidisciplinario está compuesto por profesionales apasionados por crear soluciones
+          tecnológicas inclusivas.
+        </p>
+
+        <div class="team-grid">
+          <div class="team-card">
+            <div class="avatar">👤</div>
+            <div class="team-meta">
+              <h3>Juan Carlos Sánchez Delgado</h3>
+              <p>Director de Proyecto</p>
+            </div>
+          </div>
+          <div class="team-card">
+            <div class="avatar">👤</div>
+            <div class="team-meta">
+              <h3>Christian Uriel Huerta Ibarra</h3>
+              <p>Desarrollador Full Stack</p>
+            </div>
+          </div>
+          <div class="team-card">
+            <div class="avatar">👤</div>
+            <div class="team-meta">
+              <h3>Hugo Soldevilla Gómez Preciado</h3>
+              <p>Arquitecto de Software</p>
+            </div>
+          </div>
+          <div class="team-card">
+            <div class="avatar">👤</div>
+            <div class="team-meta">
+              <h3>Walter Reynaldo Calzada Contreras</h3>
+              <p>Ingeniero de Sistemas</p>
+            </div>
+          </div>
+          <div class="team-card">
+            <div class="avatar">👤</div>
+            <div class="team-meta">
+              <h3>Erick Manuel Flores García</h3>
+              <p>Especialista en UX/UI</p>
+            </div>
+          </div>
+          <div class="team-card">
+            <div class="avatar">👤</div>
+            <div class="team-meta">
+              <h3>Luis Ángel López García</h3>
+              <p>Desarrollador Backend</p>
+            </div>
+          </div>
+          <div class="team-card">
+            <div class="avatar">👤</div>
+            <div class="team-meta">
+              <h3>Abel Lázaro Bárcenas Juárez</h3>
+              <p>Analista de Sistemas</p>
+            </div>
+          </div>
+          <div class="team-card">
+            <div class="avatar">👤</div>
+            <div class="team-meta">
+              <h3>Arlet Monserrat Martínez Millán</h3>
+              <p>Diseñadora UI/UX</p>
+            </div>
+          </div>
+          <div class="team-card">
+            <div class="avatar">⭐</div>
+            <div class="team-meta">
+              <h3>Isaac Alexander Rubio Velarde</h3>
+              <p>Diseñador UI/UX • Backend • Integración Front/Back y Analytics</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============== MODO RASPBERRY =============== -->
+    <section id="display-mode" class="info-view" data-title="Modo Raspberry">
+      <header class="info-header">
+        <button class="back-button" onclick="window.location.href='#menu'">
+          <i class="bi bi-arrow-left"></i>
+        </button>
+        <div class="title-col">
+          <h1>Modo Raspberry (7&quot;)</h1>
+          <p class="subtitle">Adapta HELEN para pantallas táctiles compactas</p>
+        </div>
+      </header>
+
+      <div class="panel mode-panel">
+        <p>
+          Ajusta el tamaño de tipografía y los espacios táctiles para aprovechar pantallas Raspberry Pi de 7&quot;.
+          El modo se guarda automáticamente y puede cambiarse en cualquier momento.
+        </p>
+
+        <div class="mode-toggle-group">
+          <div class="mode-status" data-mode-status aria-live="polite">Modo actual: Windows</div>
+          <button class="mode-toggle" type="button" data-mode-toggle>Cambiar a modo Raspberry (7&quot;)</button>
+        </div>
+
+        <div class="mode-color">
+          <h2 class="mode-color__title">Color de fondo de HELEN</h2>
+          <p class="mode-color__hint">Elige un color base; los destellos y burbujas seguirán activos.</p>
+          <div class="color-picker" role="radiogroup" aria-label="Color de fondo de HELEN" data-theme-color-picker>
+            <button class="color-chip" type="button" role="radio" data-color="blue" aria-checked="false" tabindex="0">
+              <span class="color-chip__swatch" style="--chip-color: #0b1220"></span>
+              <span class="color-chip__label">Azul</span>
+            </button>
+            <button class="color-chip" type="button" role="radio" data-color="red" aria-checked="false" tabindex="-1">
+              <span class="color-chip__swatch" style="--chip-color: #200b13"></span>
+              <span class="color-chip__label">Rojo</span>
+            </button>
+            <button class="color-chip" type="button" role="radio" data-color="green" aria-checked="false" tabindex="-1">
+              <span class="color-chip__swatch" style="--chip-color: #0b2016"></span>
+              <span class="color-chip__label">Verde</span>
+            </button>
+            <button class="color-chip" type="button" role="radio" data-color="purple" aria-checked="false" tabindex="-1">
+              <span class="color-chip__swatch" style="--chip-color: #1a0b2b"></span>
+              <span class="color-chip__label">Morado</span>
+            </button>
+            <button class="color-chip" type="button" role="radio" data-color="pink" aria-checked="false" tabindex="-1">
+              <span class="color-chip__swatch" style="--chip-color: #260b1d"></span>
+              <span class="color-chip__label">Rosa</span>
+            </button>
+          </div>
+        </div>
+
+        <p class="mode-note">El modo seleccionado se aplicará a toda la interfaz, sin depender del tamaño de la pantalla.</p>
+      </div>
+
+      <div class="panel mode-details">
+        <h2>Qué cambia en el modo Raspberry</h2>
+        <ul class="mode-benefits">
+          <li>Tipografía ampliada aproximadamente un 12&nbsp;% para mejorar la lectura.</li>
+          <li>Botones y tarjetas con alturas táctiles de al menos 44&nbsp;px.</li>
+          <li>Márgenes laterales reducidos para aprovechar pantallas de 800×480 / 1024×600.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="../../jsSignHandler/SocketIO.js"></script>
+  <script src="../../jsSignHandler/eventConnector.js"></script>
+  <script src="../../jsSignHandler/actions.js"></script>
+  <script src="../../jsSignHandler/loadingScreenLoader.js"></script>
+  <script src="../../ui/notifications/notifications.js" defer></script>
+  <script src="../jsFrontend/alarm-core.js" defer></script>
+
+  <!-- Navegación por hash (igual que antes, sin tocar backend) -->
+  <script>
+    (function () {
+      const views = [...document.querySelectorAll('.info-view')];
+      const title = (v) => v?.dataset?.title || 'Información';
+      const modeStatus = document.querySelector('[data-mode-status]');
+      const modeButton = document.querySelector('[data-mode-toggle]');
+      const modeHelper = window.HelenDisplayMode;
+      const colorPicker = document.querySelector('[data-theme-color-picker]');
+      const colorButtons = colorPicker ? Array.from(colorPicker.querySelectorAll('[data-color]')) : [];
+      const backgroundHelper = window.HelenTheme && window.HelenTheme.background;
+
+      const updateModeUI = (mode) => {
+        const normalized = (mode || '').toLowerCase() === 'raspberry' ? 'raspberry' : 'windows';
+        if (modeStatus) {
+          modeStatus.textContent = `Modo actual: ${normalized === 'raspberry' ? 'Raspberry (7")' : 'Windows'}`;
+        }
+        if (modeButton) {
+          modeButton.textContent = normalized === 'raspberry'
+            ? 'Cambiar a modo Windows'
+            : 'Cambiar a modo Raspberry (7")';
+        }
+      };
+
+      const updateColorSelection = (color) => {
+        if (!colorButtons.length) {
+          return;
+        }
+        let hasActive = false;
+        colorButtons.forEach((button) => {
+          const isSelected = button.dataset.color === color;
+          button.classList.toggle('is-selected', isSelected);
+          button.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+          button.setAttribute('tabindex', isSelected ? '0' : '-1');
+          if (isSelected) {
+            hasActive = true;
+          }
+        });
+        if (!hasActive) {
+          const [first] = colorButtons;
+          if (first) {
+            first.setAttribute('tabindex', '0');
+          }
+        }
+      };
+
+      if (modeButton && modeHelper) {
+        modeButton.addEventListener('click', () => {
+          const nextMode = modeHelper.current() === 'raspberry' ? 'windows' : 'raspberry';
+          modeHelper.set(nextMode);
+        });
+      }
+
+      if (colorPicker && colorButtons.length && backgroundHelper) {
+        colorButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            const color = button.dataset.color;
+            if (!color) {
+              return;
+            }
+            console.debug('[Helen] Cambio de color de fondo solicitado:', color);
+            const applied = backgroundHelper.set(color);
+            updateColorSelection(applied);
+          });
+
+          button.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              button.click();
+            }
+          });
+        });
+
+        const initialColor = backgroundHelper.get();
+        updateColorSelection(initialColor);
+
+        window.addEventListener('helen:background-color', (event) => {
+          const color = event?.detail?.color;
+          if (color) {
+            updateColorSelection(color);
+          }
+        });
+      }
+
+      if (typeof window !== 'undefined') {
+        window.addEventListener('helen:display-mode', (event) => {
+          const mode = event?.detail?.mode;
+          updateModeUI(mode);
+        });
+        try {
+          window.dispatchEvent(new CustomEvent('helen:display-mode:request-sync'));
+        } catch (error) {
+          window.dispatchEvent({ type: 'helen:display-mode:request-sync' });
+        }
+      }
+
+      updateModeUI(modeHelper ? modeHelper.current() : 'windows');
+
+      function showView(hash) {
+        const id = (hash || '#menu').replace('#', '');
+        views.forEach(v => v.classList.toggle('is-active', v.id === id));
+        document.title = 'HELEN – ' + title(document.getElementById(id));
+      }
+
+      window.addEventListener('hashchange', () => showView(location.hash));
+      showView(location.hash || '#menu');
+    })();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,12 @@
+venv_model/
+.venv/
+__pycache__/
+*.pyc
+data/
+features/
+models/
+logs/
+*.npz
+*.weights.h5
+*.keras
+*.mp4
