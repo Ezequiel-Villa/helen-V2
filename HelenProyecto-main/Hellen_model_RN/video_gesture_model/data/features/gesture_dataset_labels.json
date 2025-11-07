@@ -1,0 +1,11 @@
+{
+  "activar": 0,
+  "agregar": 1,
+  "alarma": 2,
+  "clima": 3,
+  "configuracion": 4,
+  "dispositivos": 5,
+  "home": 6,
+  "reloj": 7,
+  "tutorial": 8
+}
