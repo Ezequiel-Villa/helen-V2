@@ -498,6 +498,22 @@
     editingAlarmId = null;
   };
 
+  const focusAlarmForm = () => {
+    if (timeInput && typeof timeInput.focus === 'function') {
+      timeInput.focus({ preventScroll: true });
+    }
+  };
+
+  const handleAddAlarmGesture = () => {
+    if (!modal) return;
+    if (!modal.classList.contains('open')) {
+      openAlarmModal('create');
+      window.setTimeout(focusAlarmForm, 150);
+    }
+  };
+
+  window.addEventListener('helen:add-alarm', handleAddAlarmGesture);
+
   const openDeleteModal = (id) => {
     if (!deleteModal) return;
     pendingDeleteId = id;

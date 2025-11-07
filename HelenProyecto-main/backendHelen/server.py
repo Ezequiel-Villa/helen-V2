@@ -2424,6 +2424,46 @@ class SyntheticStreamAdapter:
         return None
 
 
+class ExternalGestureStream:
+    """Placeholder stream when gestures arrive exclusively via HTTP."""
+
+    source = "external"
+
+    def next(self, timeout: float = 0.0) -> Tuple[List[float], Optional[str]]:  # noqa: ARG002 - API parity
+        raise TimeoutError("External inference mode does not provide local frames")
+
+    def status(self) -> Dict[str, Any]:
+        return {
+            "healthy": True,
+            "external_only": True,
+            "message": "Esperando gestos externos vía /gestures/gesture-key",
+        }
+
+    def last_landmarks(self) -> Optional[List[LandmarkPoint]]:  # pragma: no cover - external mode
+        return None
+
+
+class NullGesturePipeline:
+    """No-op pipeline used when the vision stack is disabled."""
+
+    def __init__(self, runtime: "HelenRuntime") -> None:
+        self._runtime = runtime
+        self._running = False
+
+    def start(self) -> None:
+        if not self._running:
+            LOGGER.info(
+                "Modo de inferencia externa activo: no se lanzará el hilo de procesamiento de gestos"
+            )
+        self._running = True
+
+    def stop(self) -> None:
+        self._running = False
+
+    def is_running(self) -> bool:
+        return self._running
+
+
 class CameraGestureStream:
     """Capture MediaPipe hand landmarks from a physical camera."""
 
@@ -3242,18 +3282,31 @@ class HelenRuntime:
 
         classifier, classifier_meta = self._create_classifier()
         self.classifier = classifier
-        self.model_source = classifier_meta["source"]
-        self.model_loaded = classifier_meta["loaded"]
+        self.model_source = classifier_meta.get("source", "")
+        self.model_loaded = bool(classifier_meta.get("loaded", False))
 
         stream, stream_meta = self._create_stream()
         self.stream = stream
-        self.stream_source = stream_meta["source"]
+        self.stream_source = stream_meta.get("source", "")
 
-        self.pipeline = GesturePipeline(
-            self,
-            interval_s=self.config.poll_interval_s,
-            frame_stride=self.config.process_every_n,
+        self.external_only = bool(
+            classifier is None
+            or classifier_meta.get("external_only")
+            or stream_meta.get("external_only")
         )
+
+        if self.external_only:
+            self.pipeline = NullGesturePipeline(self)
+        else:
+            self.pipeline = GesturePipeline(
+                self,
+                interval_s=self.config.poll_interval_s,
+                frame_stride=self.config.process_every_n,
+            )
+        if self.external_only:
+            LOGGER.info(
+                "Se operará en modo de inferencia externa; conecte el script de tiempo real al endpoint /gestures/gesture-key"
+            )
         self.lock = threading.Lock()
         self.latency_history: Deque[float] = deque(maxlen=240)
         self.last_prediction: Optional[Dict[str, Any]] = None
@@ -3388,11 +3441,15 @@ class HelenRuntime:
         except Exception as error:
             LOGGER.warning("No se pudo cargar el modelo de producción: %s", error)
             dataset_path = self.config.dataset_path
-            if not dataset_path.exists():
-                _notify_missing_dataset(dataset_path)
-                raise RuntimeError("No hay dataset disponible para el clasificador de respaldo") from error
-            fallback = SimpleGestureClassifier(dataset_path)
-            return fallback, {"source": "synthetic", "loaded": True}
+            if dataset_path.exists():
+                fallback = SimpleGestureClassifier(dataset_path)
+                return fallback, {"source": "synthetic", "loaded": True}
+
+            _notify_missing_dataset(dataset_path)
+            LOGGER.warning(
+                "No hay modelo ni dataset local; se habilitará el modo de inferencia externa"
+            )
+            return None, {"source": "external", "loaded": False, "external_only": True}
 
     # ------------------------------------------------------------------
     def _create_stream(self) -> Tuple[Any, Dict[str, Any]]:
@@ -3439,12 +3496,16 @@ class HelenRuntime:
                         LOGGER.warning("Reintento de cámara fallido: %s", retry_error)
 
         dataset_path = self.config.dataset_path
-        if not dataset_path.exists():
-            _notify_missing_dataset(dataset_path)
-            raise RuntimeError("No se puede iniciar el flujo sintético: falta el dataset")
+        if dataset_path.exists():
+            LOGGER.info("Usando flujo sintético de gestos desde %s", dataset_path)
+            return SyntheticStreamAdapter(dataset_path), {"source": "synthetic"}
 
-        LOGGER.info("Usando flujo sintético de gestos desde %s", dataset_path)
-        return SyntheticStreamAdapter(dataset_path), {"source": "synthetic"}
+        _notify_missing_dataset(dataset_path)
+        LOGGER.warning(
+            "No hay cámara disponible ni dataset local; las predicciones deberán llegar por HTTP"
+        )
+        self.config.enable_camera = False
+        return ExternalGestureStream(), {"source": "external", "external_only": True}
 
     # ------------------------------------------------------------------
     def start(self) -> None:
@@ -3521,11 +3582,17 @@ class HelenRuntime:
             stream, stream_meta = self._create_stream()
             self.stream = stream
             self.stream_source = stream_meta.get("source", "")
-            self.pipeline = GesturePipeline(
-                self,
-                interval_s=self.config.poll_interval_s,
-                frame_stride=self.config.process_every_n,
-            )
+            classifier_external = self.classifier is None
+            stream_external = bool(stream_meta.get("external_only"))
+            self.external_only = classifier_external or stream_external
+            if self.external_only:
+                self.pipeline = NullGesturePipeline(self)
+            else:
+                self.pipeline = GesturePipeline(
+                    self,
+                    interval_s=self.config.poll_interval_s,
+                    frame_stride=self.config.process_every_n,
+                )
 
         self.pipeline.start()
         return self.mode_snapshot(persisted_mode=persisted)
@@ -3564,7 +3631,8 @@ class HelenRuntime:
             "pipeline": {
                 "poll_interval_s": float(self.config.poll_interval_s),
                 "process_every_n": int(self.config.process_every_n),
-                "running": self.pipeline.is_running(),
+                "running": self.pipeline.is_running() or self.external_only,
+                "external_only": self.external_only,
             },
             "stream": stream_status,
             "vision": self.vision_snapshot,
@@ -3731,7 +3799,11 @@ class HelenRuntime:
             heartbeat_age = time.time() - self.last_heartbeat if self.last_heartbeat else None
 
         pipeline_running = self.pipeline.is_running()
+        model_loaded = self.model_loaded
         stream_status = getattr(self.stream, "status", lambda: {})()
+        if self.external_only:
+            pipeline_running = True
+            model_loaded = True
         camera_ok = bool(stream_status.get("healthy")) if self.stream_source == "camera" else True
 
         selection_info = stream_status.get("selection") or {}
@@ -3751,12 +3823,17 @@ class HelenRuntime:
         status = "HEALTHY"
         if last_error:
             status = "ERROR"
-        elif not pipeline_running or (heartbeat_age is not None and heartbeat_age > 5.0) or not camera_ok or not self.model_loaded:
+        elif (
+            not pipeline_running
+            or (heartbeat_age is not None and heartbeat_age > 5.0)
+            or not camera_ok
+            or not model_loaded
+        ):
             status = "DEGRADED"
 
         return HealthSnapshot(
             status=status,
-            model_loaded=self.model_loaded,
+            model_loaded=model_loaded,
             model_source=self.model_source,
             session_id=self.session_id,
             pipeline_running=pipeline_running,
