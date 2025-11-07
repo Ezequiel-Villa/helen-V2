@@ -7,3 +7,14 @@ reports/logs/*
 !reports/logs/win/
 !reports/logs/pi/.gitkeep
 !reports/logs/win/.gitkeep
+
+# Entornos virtuales
+.venv/
+
+# __pycache__ y compilados
+**/__pycache__/
+*.pyc
+
+# Logs de runtime / reports
+reports/logs/
+reports/logs/win/
