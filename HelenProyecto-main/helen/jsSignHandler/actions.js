@@ -73,9 +73,23 @@ const resolveGestureFromPayload = (payload = {}) => {
     return '';
 };
 
+const dispatchAddAlarmGesture = () => {
+    if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') {
+        return;
+    }
+
+    try {
+        const event = new CustomEvent('helen:add-alarm', { detail: { source: 'gesture' } });
+        window.dispatchEvent(event);
+    } catch (error) {
+        window.dispatchEvent({ type: 'helen:add-alarm', detail: { source: 'gesture' } });
+    }
+};
+
 const gestureActions = {
     alarma: () => goToAlarm(),
     alarmas: () => goToAlarm(),
+    agregar: () => dispatchAddAlarmGesture(),
     clima: () => goToWeather(),
     weather: () => goToWeather(),
     inicio: () => goToHome(),
@@ -86,7 +100,8 @@ const gestureActions = {
     configuracion: () => goToSettings(),
     dispositivos: () => goToDevices(),
     foco: () => goToDevices(),
-    devices: () => goToDevices()
+    devices: () => goToDevices(),
+    tutorial: () => goToTutorial()
 };
 
 const triggerActivationRing = (options = {}) => {
