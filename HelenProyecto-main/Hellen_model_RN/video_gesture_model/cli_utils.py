@@ -10,7 +10,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
 
-import config
+# Import robusto: funciona tanto como paquete como script
+try:
+    from . import config
+except Exception:  # ejecución directa desde la carpeta
+    import config  # type: ignore
 
 
 GestureInventory = List[Tuple[str, int]]
