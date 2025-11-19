@@ -57,7 +57,7 @@
   "quality_rejection_rate": 0.0,
   "threshold_rejections": {},
   "classes": {
-    "Inicio": {
+    "Clima": {
       "tp": 0,
       "fp": 0,
       "fn": 0,
@@ -78,7 +78,7 @@
       },
       "rejections": {}
     },
-    "Clima": {
+    "Start": {
       "tp": 0,
       "fp": 0,
       "fn": 0,
@@ -120,7 +120,7 @@
       },
       "rejections": {}
     },
-    "Start": {
+    "Inicio": {
       "tp": 0,
       "fp": 0,
       "fn": 0,

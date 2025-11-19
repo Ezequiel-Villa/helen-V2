@@ -25,10 +25,10 @@
 ### Rendimiento por clase
 | Clase | Precision | Recall | F1 | TP | FP | FN |
 |-------|-----------|--------|----|----|----|----|
-| Inicio | nan | nan | nan | 0 | 0 | 0 |
 | Clima | nan | nan | nan | 0 | 0 | 0 |
-| Reloj | nan | nan | nan | 0 | 0 | 0 |
 | Start | nan | nan | nan | 0 | 0 | 0 |
+| Reloj | nan | nan | nan | 0 | 0 | 0 |
+| Inicio | nan | nan | nan | 0 | 0 | 0 |
 
 ### Matriz de confusión
 Sin datos de validación etiquetados.
