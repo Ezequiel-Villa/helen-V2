@@ -184,8 +184,9 @@ REPO_ROOT = _resolve_repo_root()
 FRONTEND_ROOT = REPO_ROOT / "helen"
 MODEL_DIR = REPO_ROOT / "Hellen_model_RN"
 MODEL_PATH = MODEL_DIR / "model.p"
-VIDEO_MODEL_PATH = MODEL_DIR / "video_gesture_model" / "models" / "gesture_model_20251106_063546"
-VIDEO_LABELS_PATH = VIDEO_MODEL_PATH / "labels.json"
+VIDEO_MODEL_DIR = MODEL_DIR / "video_gesture_model" / "models" / "gesture_model_20251106_063546"
+VIDEO_MODEL_SAVEDMODEL = VIDEO_MODEL_DIR / "saved_model.pb"
+VIDEO_LABELS_PATH = VIDEO_MODEL_DIR / "labels.json"
 
 PRIMARY_DATASET_NAME = "data.pickle"
 LEGACY_DATASET_NAME = "data1.pickle"
@@ -2326,9 +2327,23 @@ class VideoGestureClassifier:
 
     source = "video_model"
 
-    def __init__(self, model_dir: Path, labels_path: Optional[Path] = None) -> None:
-        if not model_dir.exists():
-            raise FileNotFoundError(f"No se encontró el modelo de video en {model_dir!s}")
+    def __init__(self, model_path: Path, labels_path: Optional[Path] = None) -> None:
+        model_path = Path(model_path)
+        if not model_path.exists():
+            raise FileNotFoundError(f"No se encontró el modelo de video en {model_path!s}")
+
+        if model_path.is_file() and model_path.name == "saved_model.pb":
+            model_dir = model_path.parent
+        elif model_path.is_dir():
+            model_dir = model_path
+        else:
+            model_dir = model_path.parent
+
+        saved_model_file = model_dir / "saved_model.pb"
+        if not saved_model_file.exists():
+            raise FileNotFoundError(
+                f"No se encontró saved_model.pb en {saved_model_file!s}; verifica la exportación del modelo"
+            )
 
         self._model_dir = model_dir
         self._labels_path = labels_path or (model_dir / "labels.json")
@@ -2340,7 +2355,7 @@ class VideoGestureClassifier:
             load_label_map as load_video_label_map,
         )
 
-        self._predict = build_video_predict_fn(model_dir)
+        self._predict = build_video_predict_fn(model_path)
         self._label_map = load_video_label_map(self._labels_path)
         self._lock = threading.Lock()
         self.sequence_length = int(video_config.SEQUENCE_LENGTH)
@@ -3751,8 +3766,8 @@ class HelenRuntime:
     # ------------------------------------------------------------------
     def _create_classifier(self) -> Tuple[Any, Dict[str, Any]]:
         try:
-            classifier = VideoGestureClassifier(VIDEO_MODEL_PATH, VIDEO_LABELS_PATH)
-            LOGGER.info("Modelo de video cargado desde %s", VIDEO_MODEL_PATH)
+            classifier = VideoGestureClassifier(VIDEO_MODEL_SAVEDMODEL, VIDEO_LABELS_PATH)
+            LOGGER.info("Modelo de video cargado desde %s", VIDEO_MODEL_SAVEDMODEL)
             return classifier, {
                 "source": VideoGestureClassifier.source,
                 "loaded": True,
