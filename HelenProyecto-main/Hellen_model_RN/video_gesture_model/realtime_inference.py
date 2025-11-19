@@ -82,9 +82,17 @@ def build_predict_fn(model_path: Path) -> Callable[[np.ndarray], np.ndarray]:
       - SavedModel exportado en carpeta (contiene saved_model.pb)
       - Archivo Keras (.keras / .h5)
     """
-    if model_path.is_dir() and (model_path / "saved_model.pb").exists():
+    model_path = Path(model_path)
+
+    saved_model_dir: Optional[Path] = None
+    if model_path.is_file() and model_path.name == "saved_model.pb":
+        saved_model_dir = model_path.parent
+    elif model_path.is_dir():
+        saved_model_dir = model_path
+
+    if saved_model_dir and (saved_model_dir / "saved_model.pb").exists():
         # SavedModel exportado con model.export(...)
-        saved = tf.saved_model.load(str(model_path))
+        saved = tf.saved_model.load(str(saved_model_dir))
         # Nombre típico de la firma impreso por export: "serve"
         if "serve" in saved.signatures:
             infer = saved.signatures["serve"]
