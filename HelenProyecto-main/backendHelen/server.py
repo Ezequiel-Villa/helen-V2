@@ -43,6 +43,7 @@ from http.server import SimpleHTTPRequestHandler
 from pathlib import Path
 from typing import Any, Deque, Dict, Iterable, List, NamedTuple, Optional, Sequence, Tuple, TYPE_CHECKING, Union
 import statistics
+import numpy as np
 from xml.sax.saxutils import escape
 
 try:  # pragma: no cover - optional dependency in CI
@@ -56,6 +57,8 @@ except Exception:  # pragma: no cover - handled gracefully at runtime
     mp = None  # type: ignore
 
 from Hellen_model_RN.helpers import labels_dict
+from Hellen_model_RN.video_gesture_model import config as video_config
+from Hellen_model_RN.video_gesture_model.extract_landmarks import normalise_landmarks
 from Hellen_model_RN.simple_classifier import (
     Prediction,
     SimpleGestureClassifier,
@@ -181,6 +184,8 @@ REPO_ROOT = _resolve_repo_root()
 FRONTEND_ROOT = REPO_ROOT / "helen"
 MODEL_DIR = REPO_ROOT / "Hellen_model_RN"
 MODEL_PATH = MODEL_DIR / "model.p"
+VIDEO_MODEL_PATH = MODEL_DIR / "video_gesture_model" / "models" / "gesture_model_20251106_063546"
+VIDEO_LABELS_PATH = VIDEO_MODEL_PATH / "labels.json"
 
 PRIMARY_DATASET_NAME = "data.pickle"
 LEGACY_DATASET_NAME = "data1.pickle"
@@ -2316,6 +2321,48 @@ class HealthSnapshot:
     last_error: Optional[str] = None
 
 
+class VideoGestureClassifier:
+    """TensorFlow classifier for the video-based gesture model."""
+
+    source = "video_model"
+
+    def __init__(self, model_dir: Path, labels_path: Optional[Path] = None) -> None:
+        if not model_dir.exists():
+            raise FileNotFoundError(f"No se encontró el modelo de video en {model_dir!s}")
+
+        self._model_dir = model_dir
+        self._labels_path = labels_path or (model_dir / "labels.json")
+        if not self._labels_path.exists():
+            raise FileNotFoundError(f"No se encontró labels.json en {self._labels_path!s}")
+
+        from Hellen_model_RN.video_gesture_model.realtime_inference import (
+            build_predict_fn as build_video_predict_fn,
+            load_label_map as load_video_label_map,
+        )
+
+        self._predict = build_video_predict_fn(model_dir)
+        self._label_map = load_video_label_map(self._labels_path)
+        self._lock = threading.Lock()
+        self.sequence_length = int(video_config.SEQUENCE_LENGTH)
+
+    # ------------------------------------------------------------------
+    def predict_sequence(self, frames: Sequence[Sequence[float]]) -> Prediction:
+        if len(frames) < self.sequence_length:
+            raise ValueError(
+                f"Se requieren {self.sequence_length} frames para inferir, se recibieron {len(frames)}"
+            )
+
+        window = list(frames)[-self.sequence_length :]
+        array = np.asarray(window, dtype=np.float32).reshape(1, self.sequence_length, -1)
+        with self._lock:
+            probabilities = self._predict(array)[0]
+
+        index = int(np.argmax(probabilities))
+        score = float(probabilities[index])
+        label = self._label_map.get(index, str(index))
+        return Prediction(label=label, score=score)
+
+
 class ProductionGestureClassifier:
     """Thin wrapper around the trained XGBoost model stored in ``model.p``."""
 
@@ -2439,8 +2486,167 @@ class ExternalGestureStream:
             "message": "Esperando gestos externos vía /gestures/gesture-key",
         }
 
-    def last_landmarks(self) -> Optional[List[LandmarkPoint]]:  # pragma: no cover - external mode
-        return None
+
+class VideoGestureStream:
+    """Capture MediaPipe landmarks for both hands and emit normalised frames."""
+
+    source = "video_camera"
+
+    def __init__(
+        self,
+        *,
+        camera_index: Optional[Union[int, str]] = None,
+        detection_confidence: float = 0.6,
+        tracking_confidence: float = 0.5,
+        selection: Optional[CameraSelection] = None,
+    ) -> None:
+        if cv2 is None:
+            raise RuntimeError("OpenCV no está instalado. Ejecuta `pip install opencv-python`.")
+        if mp is None:
+            raise RuntimeError("MediaPipe no está instalado. Ejecuta `pip install mediapipe`.")
+
+        resolved_index: Optional[Union[int, str]] = camera_index
+        if selection:
+            if selection.index is not None:
+                resolved_index = selection.index
+            elif selection.device:
+                resolved_index = selection.device
+        self._camera_index = resolved_index
+        self._selection = selection
+        self._detection_confidence = detection_confidence
+        self._tracking_confidence = tracking_confidence
+
+        self._cap: Optional[Any] = None
+        self._hands: Optional[Any] = None
+        self._opened = False
+        self._last_capture: Optional[float] = None
+        self._last_error: Optional[str] = None
+        self._healthy = False
+        self._frames_without_hand = 0
+        self._last_landmarks: Optional[List[LandmarkPoint]] = None
+        self._last_frame_shape: Optional[Tuple[int, int]] = None
+
+    # ------------------------------------------------------------------
+    def open(self) -> None:
+        if self._opened:
+            return
+
+        target: Any = self._camera_index if self._camera_index is not None else 0
+        cap = cv2.VideoCapture(target)
+        if not cap or not cap.isOpened():
+            self._last_error = f"No se pudo abrir la cámara en {target}"
+            raise RuntimeError(self._last_error)
+
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, video_config.FRAME_WIDTH)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, video_config.FRAME_HEIGHT)
+
+        self._hands = mp.solutions.hands.Hands(
+            static_image_mode=False,
+            max_num_hands=video_config.MAX_HANDS,
+            min_detection_confidence=self._detection_confidence,
+            min_tracking_confidence=self._tracking_confidence,
+        )
+
+        self._cap = cap
+        self._opened = True
+        self._healthy = True
+        self._last_error = None
+
+    # ------------------------------------------------------------------
+    def close(self) -> None:
+        if self._cap is not None:
+            with contextlib.suppress(Exception):
+                self._cap.release()
+        if self._hands is not None:
+            with contextlib.suppress(Exception):
+                self._hands.close()
+        self._opened = False
+
+    # ------------------------------------------------------------------
+    def next(self, timeout: float = 2.0) -> Tuple[List[float], Optional[str]]:
+        if not self._opened:
+            self.open()
+
+        assert self._cap is not None
+        assert self._hands is not None
+
+        start = time.time()
+        while True:
+            if timeout and (time.time() - start) > timeout:
+                self._last_error = "Tiempo de espera agotado sin detectar mano"
+                self._healthy = False
+                raise TimeoutError(self._last_error)
+
+            ok, frame = self._cap.read()
+            if not ok or frame is None:
+                self._last_error = "No se pudo leer un frame de la cámara"
+                self._healthy = False
+                time.sleep(0.05)
+                continue
+
+            height, width = frame.shape[:2]
+            if height <= 0 or width <= 0:
+                self._last_error = "Dimensiones de imagen no válidas"
+                self._healthy = False
+                time.sleep(0.05)
+                continue
+
+            self._last_frame_shape = (int(height), int(width))
+
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = self._hands.process(frame_rgb)
+
+            frame_features = np.zeros(
+                (video_config.MAX_HANDS, video_config.NUM_HAND_LANDMARKS, video_config.LANDMARK_DIM),
+                dtype=np.float32,
+            )
+            if results.multi_hand_landmarks and results.multi_handedness:
+                ordering: Dict[str, int] = {"Left": 0, "Right": 1}
+                for hand_landmarks, handedness in zip(
+                    results.multi_hand_landmarks, results.multi_handedness
+                ):
+                    label = handedness.classification[0].label
+                    idx = ordering.get(label, 0)
+                    coords = np.array(
+                        [[lm.x, lm.y, lm.z] for lm in hand_landmarks.landmark],
+                        dtype=np.float32,
+                    )
+                    frame_features[idx] = coords
+                    self._last_landmarks = [
+                        (float(lm.x), float(lm.y), float(getattr(lm, "z", 0.0)))
+                        for lm in hand_landmarks.landmark
+                    ]
+
+            if frame_features.sum() == 0:
+                self._frames_without_hand += 1
+                self._last_landmarks = None
+                time.sleep(0.02)
+                continue
+
+            self._frames_without_hand = 0
+            normalised = normalise_landmarks(frame_features.flatten())
+            self._last_capture = time.time()
+            self._healthy = True
+            self._last_error = None
+            return normalised.tolist(), None
+
+    # ------------------------------------------------------------------
+    def status(self) -> Dict[str, Any]:
+        return {
+            "healthy": self._healthy,
+            "camera_index": self._camera_index,
+            "last_capture": self._last_capture,
+            "last_error": self._last_error,
+            "frames_without_hand": self._frames_without_hand,
+            "frame_shape": self._last_frame_shape,
+            "selection": self._selection.to_dict() if self._selection else None,
+        }
+
+    # ------------------------------------------------------------------
+    def last_landmarks(self) -> Optional[List[LandmarkPoint]]:
+        if not self._last_landmarks:
+            return None
+        return list(self._last_landmarks)
 
 
 class NullGesturePipeline:
@@ -3124,6 +3330,107 @@ class _SSEClient:
                 self._handler.wfile.flush()
 
 
+class VideoGesturePipeline:
+    """Background thread that buffers frames for the TensorFlow model."""
+
+    def __init__(
+        self,
+        runtime: "HelenRuntime",
+        *,
+        interval_s: float = 0.04,
+        frame_stride: int = 1,
+        sequence_length: int,
+    ) -> None:
+        self._runtime = runtime
+        self._interval = float(max(0.01, interval_s))
+        self._frame_stride = max(1, int(frame_stride))
+        self._sequence_length = max(1, int(sequence_length))
+        self._thread: Optional[threading.Thread] = None
+        self._running = False
+        self._stride_cursor = 0
+
+    # ------------------------------------------------------------------
+    def start(self) -> None:
+        if self._thread and self._thread.is_alive():
+            return
+
+        self._running = True
+        self._thread = threading.Thread(target=self.run, name="VideoGesturePipeline", daemon=True)
+        self._thread.start()
+
+    # ------------------------------------------------------------------
+    def stop(self) -> None:
+        self._running = False
+        thread = self._thread
+        if thread:
+            thread.join(timeout=1.5)
+
+    # ------------------------------------------------------------------
+    def run(self) -> None:
+        LOGGER.info("Gesture pipeline (video model) iniciada")
+        buffer: Deque[Sequence[float]] = deque(maxlen=self._sequence_length)
+        sequence = 1
+        while self._running:
+            try:
+                features, source_label = self._runtime.stream.next(timeout=1.5)
+            except TimeoutError:
+                time.sleep(self._interval)
+                continue
+            except Exception as error:  # pragma: no cover - depends on environment
+                self._runtime.report_error(f"stream_error: {error}")
+                time.sleep(0.5)
+                continue
+
+            if self._frame_stride > 1:
+                self._stride_cursor = (self._stride_cursor + 1) % self._frame_stride
+                if self._stride_cursor != 1:
+                    time.sleep(self._interval)
+                    continue
+
+            buffer.append(list(features))
+            if len(buffer) < self._sequence_length:
+                time.sleep(self._interval)
+                continue
+
+            try:
+                start = time.perf_counter()
+                prediction: Prediction = self._runtime.classifier.predict_sequence(buffer)
+                latency_ms = (time.perf_counter() - start) * 1000.0
+            except Exception as error:  # pragma: no cover - classifier failure
+                self._runtime.report_error(f"classifier_error: {error}")
+                time.sleep(0.5)
+                continue
+
+            timestamp = time.time()
+            decision = self._runtime.decision_engine.process(
+                prediction,
+                timestamp=timestamp,
+                hint_label=source_label,
+                latency_ms=latency_ms,
+                landmarks=None,
+            )
+
+            self._runtime.clear_error()
+
+            if decision.emit:
+                event = self._runtime.build_event(
+                    label=decision.label,
+                    score=decision.score,
+                    latency_ms=latency_ms,
+                    timestamp=timestamp,
+                    sequence=sequence,
+                    origin="video_pipeline",
+                    hint_label=decision.hint_label,
+                    payload=decision.payload,
+                )
+                self._runtime.push_prediction(event)
+                sequence += 1
+
+            time.sleep(self._interval)
+
+        LOGGER.info("Gesture pipeline (video model) detenida")
+
+
 class GesturePipeline:
     """Background thread that feeds predictions to the runtime."""
 
@@ -3284,6 +3591,7 @@ class HelenRuntime:
         self.classifier = classifier
         self.model_source = classifier_meta.get("source", "")
         self.model_loaded = bool(classifier_meta.get("loaded", False))
+        self.model_kind = classifier_meta.get("model_kind", "")
 
         stream, stream_meta = self._create_stream()
         self.stream = stream
@@ -3298,11 +3606,19 @@ class HelenRuntime:
         if self.external_only:
             self.pipeline = NullGesturePipeline(self)
         else:
-            self.pipeline = GesturePipeline(
-                self,
-                interval_s=self.config.poll_interval_s,
-                frame_stride=self.config.process_every_n,
-            )
+            if self.model_kind == "video":
+                self.pipeline = VideoGesturePipeline(
+                    self,
+                    interval_s=self.config.poll_interval_s,
+                    frame_stride=self.config.process_every_n,
+                    sequence_length=getattr(self.classifier, "sequence_length", video_config.SEQUENCE_LENGTH),
+                )
+            else:
+                self.pipeline = GesturePipeline(
+                    self,
+                    interval_s=self.config.poll_interval_s,
+                    frame_stride=self.config.process_every_n,
+                )
         if self.external_only:
             LOGGER.info(
                 "Se operará en modo de inferencia externa; conecte el script de tiempo real al endpoint /gestures/gesture-key"
@@ -3435,6 +3751,17 @@ class HelenRuntime:
     # ------------------------------------------------------------------
     def _create_classifier(self) -> Tuple[Any, Dict[str, Any]]:
         try:
+            classifier = VideoGestureClassifier(VIDEO_MODEL_PATH, VIDEO_LABELS_PATH)
+            LOGGER.info("Modelo de video cargado desde %s", VIDEO_MODEL_PATH)
+            return classifier, {
+                "source": VideoGestureClassifier.source,
+                "loaded": True,
+                "model_kind": "video",
+            }
+        except Exception as error:
+            LOGGER.warning("No se pudo cargar el modelo de video: %s", error)
+
+        try:
             classifier = ProductionGestureClassifier(self.config.model_path)
             LOGGER.info("Modelo de producción cargado desde %s", self.config.model_path)
             return classifier, {"source": ProductionGestureClassifier.source, "loaded": True}
@@ -3456,6 +3783,17 @@ class HelenRuntime:
         if self.config.enable_camera:
             selection = getattr(self, "_camera_selection", None)
             try:
+                if self.model_kind == "video":
+                    stream = VideoGestureStream(
+                        camera_index=self.config.camera_index,
+                        detection_confidence=self.config.detection_confidence,
+                        tracking_confidence=self.config.tracking_confidence,
+                        selection=selection,
+                    )
+                    target = selection.device if selection and selection.device else self.config.camera_index
+                    LOGGER.info("Usando cámara física (modelo de video) en %s", target)
+                    return stream, {"source": VideoGestureStream.source}
+
                 stream = CameraGestureStream(
                     camera_index=self.config.camera_index,
                     detection_confidence=self.config.detection_confidence,
@@ -3477,6 +3815,18 @@ class HelenRuntime:
                 refreshed = self._ensure_camera_selection(force=True)
                 if refreshed:
                     self._camera_selection = refreshed
+                    try:
+                        stream = VideoGestureStream(
+                            camera_index=self.config.camera_index,
+                            detection_confidence=self.config.detection_confidence,
+                            tracking_confidence=self.config.tracking_confidence,
+                            selection=refreshed,
+                        )
+                        target = refreshed.device if refreshed.device else refreshed.index
+                        LOGGER.info("Cámara reprovisionada automáticamente en %s", target)
+                        return stream, {"source": VideoGestureStream.source}
+                    except Exception:
+                        pass
                     try:
                         stream = CameraGestureStream(
                             camera_index=self.config.camera_index,
@@ -3585,8 +3935,16 @@ class HelenRuntime:
             classifier_external = self.classifier is None
             stream_external = bool(stream_meta.get("external_only"))
             self.external_only = classifier_external or stream_external
-            if self.external_only:
-                self.pipeline = NullGesturePipeline(self)
+        if self.external_only:
+            self.pipeline = NullGesturePipeline(self)
+        else:
+            if self.model_kind == "video":
+                self.pipeline = VideoGesturePipeline(
+                    self,
+                    interval_s=self.config.poll_interval_s,
+                    frame_stride=self.config.process_every_n,
+                    sequence_length=getattr(self.classifier, "sequence_length", video_config.SEQUENCE_LENGTH),
+                )
             else:
                 self.pipeline = GesturePipeline(
                     self,
