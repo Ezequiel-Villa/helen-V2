@@ -240,8 +240,43 @@ def _notify_missing_dataset(dataset_path: Path) -> None:
 
 DATASET_PATH = _default_dataset_path()
 
-TRACKED_GESTURES = {"Start", "Clima", "Reloj", "Inicio"}
-GESTURE_ALIASES = {"Start": "H", "Clima": "C", "Reloj": "R", "Inicio": "I"}
+VIDEO_GESTURE_CANONICAL_MAP = {
+    "activar": "Start",
+    "heyhelen": "Start",
+    "holahelen": "Start",
+    "oyehelen": "Start",
+    "wake": "Start",
+    "home": "Inicio",
+}
+
+TRACKED_GESTURES = {
+    "Start",
+    "Clima",
+    "Reloj",
+    "Inicio",
+    "Alarma",
+    "Agregar",
+    "Configuracion",
+    "Dispositivos",
+    "Tutorial",
+}
+GESTURE_ALIASES = {
+    "Start": "H",
+    "Clima": "C",
+    "Reloj": "R",
+    "Inicio": "I",
+}
+
+SUPPORTED_COMMANDS = {
+    "Clima",
+    "Reloj",
+    "Inicio",
+    "Alarma",
+    "Agregar",
+    "Configuracion",
+    "Dispositivos",
+    "Tutorial",
+}
 
 MODE_STORAGE_PATH = REPO_ROOT / "backendHelen" / "runtime_mode.json"
 
@@ -324,6 +359,17 @@ DEFAULT_CLASS_THRESHOLDS: Dict[str, ClassThreshold] = {
     "Reloj": ClassThreshold(enter=0.78, release=0.68),
     "Inicio": ClassThreshold(enter=0.76, release=0.66),
 }
+
+VIDEO_COMMAND_THRESHOLD = ClassThreshold(enter=0.70, release=0.60)
+DEFAULT_CLASS_THRESHOLDS.update(
+    {
+        "Alarma": VIDEO_COMMAND_THRESHOLD,
+        "Agregar": VIDEO_COMMAND_THRESHOLD,
+        "Configuracion": VIDEO_COMMAND_THRESHOLD,
+        "Dispositivos": VIDEO_COMMAND_THRESHOLD,
+        "Tutorial": VIDEO_COMMAND_THRESHOLD,
+    }
+)
 
 GLOBAL_MIN_SCORE = 0.6
 DEFAULT_POLL_INTERVAL_S = 0.12
@@ -585,6 +631,9 @@ class GestureMetrics:
             return ""
         text = str(label).strip()
         lowered = text.lower()
+        override = VIDEO_GESTURE_CANONICAL_MAP.get(lowered)
+        if override:
+            return override
         for candidate in TRACKED_GESTURES:
             if lowered == candidate.lower():
                 return candidate
@@ -1683,7 +1732,7 @@ class GestureDecisionEngine:
                     total_votes,
                 )
 
-            if state == "listening" and canonical_label not in {"Clima", "Reloj", "Inicio"}:
+            if state == "listening" and canonical_label not in SUPPORTED_COMMANDS:
                 reason = "unsupported_command"
                 self._record(
                     label=canonical_label,

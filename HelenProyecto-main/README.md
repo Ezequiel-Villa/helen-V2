@@ -59,6 +59,29 @@ Sigue estos pasos para levantar HELEN desde el código fuente usando **un único
 
 8. **Automatiza según tu plataforma**: si prefieres no ejecutar los comandos manualmente, usa los scripts soportados en `scripts/` (`setup-pi.sh`, `run-pi.sh`, `setup-windows.ps1`, `helen-run.ps1`, etc.).
 
+## Gestos soportados por el modelo de video
+
+El backend carga automáticamente el modelo TensorFlow ubicado en
+`Hellen_model_RN/video_gesture_model/models/gesture_model_20251106_063546/saved_model.pb`.
+Para que las acciones lleguen al frontend:
+
+1. Realiza primero la seña **activar** (se ilumina el anillo y se habilita la ventana de comandos).
+2. Dentro de esa ventana, ejecuta una de las siguientes señas:
+
+| Seña (labels.json) | Acción en la UI |
+| --- | --- |
+| `activar` | Despierta el control gestual (alias de `Start`). |
+| `agregar` | Dispara el flujo de “Agregar alarma”. |
+| `alarma` | Abre la pestaña de alarmas. |
+| `clima` | Lleva a la vista de clima. |
+| `configuracion` | Abre el apartado de ajustes/configuración. |
+| `dispositivos` | Lleva a la vista de dispositivos IoT. |
+| `home` | Regresa a la pantalla principal/inicio. |
+| `reloj` | Abre la vista de reloj/temporizador. |
+| `tutorial` | Muestra el tutorial interactivo. |
+
+Si no ejecutas una seña válida tras activar, el backend volverá automáticamente al estado inactivo y tendrás que repetir la seña de activación.
+
 ## Arquitectura resumida
 
 ```
