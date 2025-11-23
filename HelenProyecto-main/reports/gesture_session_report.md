@@ -25,8 +25,8 @@
 ### Rendimiento por clase
 | Clase | Precision | Recall | F1 | TP | FP | FN |
 |-------|-----------|--------|----|----|----|----|
-| Start | nan | nan | nan | 0 | 0 | 0 |
 | Clima | nan | nan | nan | 0 | 0 | 0 |
+| Start | nan | nan | nan | 0 | 0 | 0 |
 | Reloj | nan | nan | nan | 0 | 0 | 0 |
 | Inicio | nan | nan | nan | 0 | 0 | 0 |
 

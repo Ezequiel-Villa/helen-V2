@@ -2,7 +2,7 @@ __pycache__/
 backendHelen/runtime_mode.json
 reports/config/*
 !reports/config/.gitkeep
-reports/logs/*
+reports/logs/**
 !reports/logs/pi/
 !reports/logs/win/
 !reports/logs/pi/.gitkeep
@@ -16,5 +16,13 @@ reports/logs/*
 *.pyc
 
 # Logs de runtime / reports
-reports/logs/
-reports/logs/win/
+ # Ignore report logs (kept above with exceptions)
+
+ # Ignore all log files and any `logs` directories anywhere in the repo
+ *.log
+ **/logs/
+ **/logs/**
+
+ # If some log files were already committed, run:
+ #   git rm --cached <path-to-log>
+ # then commit to stop tracking them.
